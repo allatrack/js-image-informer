@@ -467,7 +467,7 @@ MarketGidBaseBlockC144902 = function (root_id, LG, fallback, containerId) {
                     //parent.window.addEventListener("load", function(){
                     var loc = parent.window.document.location;
                     // For github use
-                    // var url = loc.protocol + "//" + loc.host + "/" + loc.pathname.split("/")[1];
+                    //var url = loc.protocol + "//" + loc.host + "/" + loc.pathname.split("/")[1];
                     // for local Server use
                     var url = loc.protocol + "//" + loc.host;
 

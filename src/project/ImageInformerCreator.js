@@ -1,4 +1,4 @@
-import {isTextNode, getMargin, getParentFontSize} from './../libs/helpers';
+import {isTextNode, getMargin, getParentFontSize, getViewPortSize} from './../libs/helpers';
 
 export default class ImageInformerCreator {
 
@@ -47,6 +47,48 @@ export default class ImageInformerCreator {
 
     get images() {
         return this._images;
+    }
+
+    tryFindArticleImages(imageWidth, before, after) {
+
+        const {viewportWidth} = getViewPortSize();
+
+        let parts =  viewportWidth/4;
+        let allImages = document.querySelectorAll('img');
+
+        let array =[];
+        [].forEach.call(allImages, img=> {
+
+            if (img.clientWidth && img.clientWidth <= imageWidth) {
+                return;
+            }
+
+            if (this._isWrappedInLink(img) || this._hasAddUpward(img)) {
+                return;
+            }
+
+            if (this._isInFigure(img)) {
+                array.push(img.parentNode);
+                return;
+            }
+
+            let rect = img.getBoundingClientRect();
+            let imageMiddle = rect.width/2;
+
+            let imageMiddleImQuarter = imageMiddle >= parts && imageMiddle <= (parts *3);
+
+            if (this._isSuitableAspectRation(img, before, after) && imageMiddleImQuarter) {
+
+                if (this._isInFigure(img)) {
+                    array.push(img.parentNode);
+                    return;
+                }
+
+                array.push(img);
+            }
+        });
+
+        return this._images = array;
     }
 
     _hasAddUpward(_element) {
@@ -134,9 +176,8 @@ export default class ImageInformerCreator {
     findSuitableImages(imageWidth = 400,  before = 0.2, after = 2) {
 
         if (!this._article) {
-            console.warn('ImageInformerCreator .findSuitableImages: Article was not specified.' +
-                ' Please set the article first!');
-            return [];
+            console.warn('ImageInformerCreator .findSuitableImages: Article was not specified.');
+            return this.tryFindArticleImages(imageWidth, before, after);
         }
 
         let array =[];
@@ -154,12 +195,13 @@ export default class ImageInformerCreator {
                 return;
             }
 
-            if (this._isInFigure(img)) {
-                array.push(img.parentNode);
-                return;
-            }
-
             if (this._isSuitableAspectRation(img, before, after)) {
+
+                if (this._isInFigure(img)) {
+                    array.push(img.parentNode);
+                    return;
+                }
+
                 array.push(img);
             }
         });

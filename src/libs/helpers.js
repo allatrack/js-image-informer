@@ -60,4 +60,31 @@ function getParentFontSize(_element){
     return fontSize + lineHeight;
 }
 
-export {isTextNode, getMargin, getParentFontSize}
+function getViewPortSize() {
+    let viewportWidth;
+    let viewportHeight;
+
+    //Standards compliant browsers (mozilla/netscape/opera/IE7)
+    if (typeof window.innerWidth != 'undefined') {
+        viewportWidth = window.innerWidth,
+            viewportHeight = window.innerHeight
+    }
+
+    // IE6
+    else if (typeof document.documentElement != 'undefined'
+        && typeof document.documentElement.clientWidth !=
+        'undefined' && document.documentElement.clientWidth != 0) {
+        viewportWidth = document.documentElement.clientWidth,
+            viewportHeight = document.documentElement.clientHeight
+    }
+
+    //Older IE
+    else {
+        viewportWidth = document.getElementsByTagName('body')[0].clientWidth,
+            viewportHeight = document.getElementsByTagName('body')[0].clientHeight
+    }
+
+    return {viewportWidth, viewportHeight};
+}
+
+export {isTextNode, getMargin, getParentFontSize, getViewPortSize}

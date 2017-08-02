@@ -77,8 +77,6 @@ export default class ArticleExtractor {
      */
     _handleSpecialCases() {
 
-
-
         if (this.article && this.article.parentNode && this.article.parentNode.children[0] && this.article.parentNode.children[0].tagName === 'HEADER') {
             this.article = this.article.parentNode;
             return;
@@ -129,12 +127,14 @@ export default class ArticleExtractor {
             });
         }
 
+
         if (this.article) {
             return;
         }
 
         console.error('SmartInformerCreator._handleSpecialCases: article In DOM not recognized');
     }
+
 
     parseArticle() {
 
@@ -157,10 +157,18 @@ export default class ArticleExtractor {
             pathBase: loc.protocol + "//" + loc.host + loc.pathname.substr(0, loc.pathname.lastIndexOf("/") + 1)
         }, document.cloneNode(true)).parse();
 
-        this.article = this._extractArticle(this.articleParsed.rootElements, true, this.articleParsed.rootElements.length);
+        try {
 
-        this._handleSpecialCases();
+            if (this.articleParsed){
+                this.article = this._extractArticle(this.articleParsed.rootElements, true, this.articleParsed.rootElements.length);
+                this._handleSpecialCases();
+            } else {
+                this.article =null;
+            }
 
-        return this.article;
+            return this.article ;
+        }catch(e){
+             console.error(e);
+        }
     }
 }

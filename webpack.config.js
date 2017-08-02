@@ -5,19 +5,20 @@ var CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
     entry: [
-        'babel-polyfill', './src/ImageInformerCreator.js'
+        './src/polyfills/polyfill.ClassList.js',
+        './src/polyfills/polyfill.includes.js',
+        './src/polyfills/polyfill.indexOf.js',
+        './src/index.js',
     ],
     output: {
-        filename: 'ImageInformerCreator.js',
-        library: 'ImageInformerCreator',
+
+        filename: 'media.sticky.widget.js',
+        library: 'stickyWidgetLib',
         path: path.resolve(__dirname, 'dist')
     },
     plugins: [
         new LiveReloadPlugin({}),
-        new CopyWebpackPlugin([{ from: 'src/pas-test.com.141665.js', to: 'pas-test.com.141665.js'}]),
-        //new webpack.optimize.UglifyJsPlugin({
-        //    compress: { warnings: false }
-        //})
+        new CopyWebpackPlugin([{ from: 'src/pas-test.com.144902.js', to: 'pas-test.com.144902.js'}]),
     ],
     module:{
         loaders: [
@@ -30,12 +31,12 @@ module.exports = {
                 ],
 
                 // Only run `.js` and `.jsx` files through Babel
-                test: /\.jsx?$/,
+                test: /\.js?$/,
 
                 // Options to configure babel with
                 query: {
                     plugins: ['transform-runtime'],
-                    presets: ['es2015', 'stage-0'],
+                    presets: ['es2015'],
                 }
             },
         ]

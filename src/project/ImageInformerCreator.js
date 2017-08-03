@@ -273,11 +273,18 @@ export default class ImageInformerCreator {
         div.classList.add('cbb');
         div.title = 'Close';
         div.addEventListener('click', ()=>iframe.style.display = 'none');
+        div.addEventListener('mousedown', e =>{
+            (e.which===2) && (iframe.style.display = 'none');
+            return true;// to allow the browser to know that we handled it.
+        });
         infoWindow.body.appendChild(div);
 
         // set styles
         var style = infoWindow.createElement('style');
         style.innerHTML = this._styles + `
+         html {
+            -ms-overflow-style: -ms-autohiding-scrollbar;
+        }
         .cbb {
             position: absolute;
             right: 0px;

@@ -1,4 +1,4 @@
-import {isTextNode, getMargin, getParentFontSize, getViewPortSize} from './../libs/helpers';
+import {isTextNode, getStylePx, getParentFontSize, getViewPortSize, getNodeHeight} from './../libs/helpers';
 
 export default class ImageInformerCreator {
 
@@ -23,6 +23,8 @@ export default class ImageInformerCreator {
         this.ids = ['ad-space', 'fb_comments_div', 'ad-space', 'div-gpt-ad',
             'MarketGidScript', 'MarketGidScriptRoot', 'disqus_comments_div',
             'ScriptRoot', 'Preload', 'MarketGidComposite', 'SC_TBlock'];
+
+        this.height = 0;
     }
 
     set stickyBlocksToPaste(blocks) {
@@ -53,10 +55,10 @@ export default class ImageInformerCreator {
 
         const {viewportWidth} = getViewPortSize();
 
-        let parts =  viewportWidth/4;
+        let parts = viewportWidth / 4;
         let allImages = document.querySelectorAll('img');
 
-        let array =[];
+        let array = [];
         [].forEach.call(allImages, img=> {
 
             if (img.clientWidth && img.clientWidth <= imageWidth) {
@@ -73,9 +75,8 @@ export default class ImageInformerCreator {
             }
 
             let rect = img.getBoundingClientRect();
-            let imageMiddle = rect.width/2;
-
-            let imageMiddleImQuarter = imageMiddle >= parts && imageMiddle <= (parts *3);
+            let imageMiddle = rect.width / 2;
+            let imageMiddleImQuarter = imageMiddle >= parts && imageMiddle <= (parts * 3);
 
             if (this._isSuitableAspectRation(img, before, after) && imageMiddleImQuarter) {
 
@@ -146,23 +147,23 @@ export default class ImageInformerCreator {
      * @returns {boolean}
      * @private
      */
-    _isSuitableAspectRation(img, before=0.5, after=2) {
+    _isSuitableAspectRation(img, before = 0.5, after = 2) {
 
-        if (img.tagName!=='IMG'){
+        if (img.tagName !== 'IMG') {
             return false;
         }
 
-        let  r = img.clientHeight / img.clientWidth;
+        let r = img.clientHeight / img.clientWidth;
 
-        return  r>=before && r <= after;
+        return r >= before && r <= after;
     }
 
-    _isInFigure(img){
-        if (!img || !img.parentNode ){
+    _isInFigure(img) {
+        if (!img || !img.parentNode) {
             return false;
         }
 
-        return img.parentNode.tagName==='FIGURE' || this._isInFigure(img.parentNode);
+        return img.parentNode.tagName === 'FIGURE' || this._isInFigure(img.parentNode);
     }
 
     /**
@@ -173,14 +174,14 @@ export default class ImageInformerCreator {
      * @param {number} after
      * @returns {*}
      */
-    findSuitableImages(imageWidth = 400,  before = 0.2, after = 2) {
+    findSuitableImages(imageWidth = 400, before = 0.2, after = 2) {
 
         if (!this._article) {
             console.warn('ImageInformerCreator .findSuitableImages: Article was not specified.');
             return this.tryFindArticleImages(imageWidth, before, after);
         }
 
-        let array =[];
+        let array = [];
         [].forEach.call(this._article.querySelectorAll('img'), img => {
 
             if (img.tagName !== 'IMG') {
@@ -256,12 +257,22 @@ export default class ImageInformerCreator {
         iframe.style.width = '100%';
         img.parentNode.insertBefore(iframe, img.nextSibling);
 
+        let self = this;
+        iframe.onload = function () {
+            setTimeout(()=>{
+                var bordersHeight = self.getBorderHeight(block);
+
+                iframe.style.height = block.clientHeight
+                    + getStylePx(block, 'marginTop')
+                    + getStylePx(block, 'marginBottom') + bordersHeight + 'px';
+            }, 500)
+        }
+
         try {
             var infoWindow = iframe.contentWindow.document;
             infoWindow.open();
-            infoWindow.writeln("<html><body></body></html>");
+            infoWindow.writeln("<html><head></head><body></body></html>");
             infoWindow.close();
-
             infoWindow.body.appendChild(block);
         }
         catch (e) {
@@ -269,20 +280,21 @@ export default class ImageInformerCreator {
         }
 
         // add close button
-        let div = document.createElement('div');
-        div.classList.add('cbb');
-        div.title = 'Close';
-        div.addEventListener('click', ()=>iframe.style.display = 'none');
-        div.addEventListener('mousedown', e =>{
-            (e.which===2) && (iframe.style.display = 'none');
+        let closeButton = infoWindow.querySelector('.mgCloseButton');
+        closeButton.addEventListener('click', ()=>iframe.style.display = 'none');
+        closeButton.addEventListener('mousedown', e => {
+            (e.which === 2) && (iframe.style.display = 'none');
             return true;// to allow the browser to know that we handled it.
         });
-        infoWindow.body.appendChild(div);
 
         // set styles
         var style = infoWindow.createElement('style');
         style.innerHTML = this._styles + `
-         html {
+        body, html{
+            margin:0;
+            padding:0;
+        }
+        html {
             -ms-overflow-style: -ms-autohiding-scrollbar;
         }
         .cbb {
@@ -301,8 +313,29 @@ export default class ImageInformerCreator {
             z-index: 9020;
         } `;
         infoWindow.head.appendChild(style);
+    }
 
-        iframe.style.height = iframe.clientHeight + getMargin(block, 'top')+ getMargin(block, 'bottom') +'px';
+    getBorderHeight(node) {
+        if (!node) {
+            return 0;
+        }
+
+        var result = 0;
+
+        if (node.children && node.children.length) {
+            [].forEach.call(node.children, element=> {
+                result += this.getBorderHeight(element);
+            })
+        }
+
+        let style = window.getComputedStyle(node);
+
+        let borderBottomWidth = style['borderBottomWidth'].replace('px', '');
+        let borderTopWidth = style['borderTopWidth'].replace('px', '');
+
+        return result
+            + parseInt(borderBottomWidth === 'auto' ? 0 : borderBottomWidth)
+            + parseInt(borderTopWidth === 'auto' ? 0 : borderTopWidth);
     }
 }
 

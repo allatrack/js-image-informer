@@ -1,8 +1,4 @@
-function _capitalizeFirstLetter(string) {
-    return string.charAt(0).toUpperCase() + string.slice(1);
-}
-
-function _getTextNodeHeight(textNode) {
+function getNodeHeight(textNode) {
     var height = 0;
     if (document.createRange) {
         var range = document.createRange();
@@ -26,20 +22,21 @@ function isTextNode(node) {
  * Get element margin
  *
  * @param {HTMLElement} _element - Web Element
- * @param {string} direction - top|bottom|left|right
+ * @param {string} styleType - margin, padding, border
  * @returns {*}
  */
-function getMargin(_element, direction) {
+function getStylePx(_element, styleType = 'margin') {
 
     try {
-        var style = _element.currentStyle || window.getComputedStyle(_element);
-        var margin = style['margin' + _capitalizeFirstLetter(direction.toLowerCase())].replace('px', '');
+        var style = window.getComputedStyle(_element);
+        var margin = style[styleType].replace('px', '');
+
         return margin!='auto' ? parseInt(margin) : 0;
 
     } catch (e) {
 
         if (_element.nodeName==='#text'){
-            return _getTextNodeHeight(_element);
+            return getNodeHeight(_element);
         }
         return 0;
     }
@@ -51,7 +48,7 @@ function isNumeric(n) {
 
 function getParentFontSize(_element){
     var parent = _element.parentNode;
-    var style = _element.currentStyle || window.getComputedStyle(parent);
+    var style = _element.currentStyle || window.getComputedStyle(_element);
     var fontSize = style.fontSize.replace('px', '');
     var lineHeight = style.lineHeight.replace('px', '');
     fontSize = isNumeric(fontSize) ? parseInt(fontSize) : 0;
@@ -87,4 +84,4 @@ function getViewPortSize() {
     return {viewportWidth, viewportHeight};
 }
 
-export {isTextNode, getMargin, getParentFontSize, getViewPortSize}
+export {isTextNode, getStylePx, getParentFontSize, getViewPortSize, getNodeHeight}

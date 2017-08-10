@@ -218,7 +218,6 @@ export default class ImageInformerCreator {
      */
     insertWidget(blocksToPaste = this._stickyBlocksToPaste, max_img_for_sticky_widget = this._images.length) {
 
-
         if (!this._images || !this._images.length) {
             console.info('ImageInformerCreator.insertWidget: No Where to render - no images. ' +
                 'Find images before calling this method. Run ImageInformerCreator.findSuitableImages.');
@@ -252,20 +251,45 @@ export default class ImageInformerCreator {
             return;
         }
 
+        var style = window.getComputedStyle(img);
+        var width = style.width;
+        var marginBottom = style.marginBottom;
+        var marginLeft = style.marginLeft;
+        var marginRight = style.marginRight;
+
+        if (img.tagName === 'FIGURE') {
+            var figureImage = img.querySelector('img');
+            if (figureImage) {
+                var _style = window.getComputedStyle(figureImage);
+                width = _style.width;
+                marginBottom = _style.marginBottom;
+                marginLeft = _style.marginLeft;
+                marginRight = _style.marginRight;
+            }
+        }
+
+        img.style.setProperty('margin-bottom', '0px', 'important');
+        img.style.setProperty('padding-bottom', '0px', 'important');
+        img.style.setProperty('display', 'block', 'important');
+
+        // reset margin bottom
         var iframe = document.createElement('iframe');
         iframe.style.borderWidth = '0';
-        iframe.style.width = '100%';
+        iframe.style.width = width;
+        iframe.style.marginBottom = marginBottom;
+        iframe.style.marginLeft = marginLeft;
+        iframe.style.marginRight = marginRight;
         img.parentNode.insertBefore(iframe, img.nextSibling);
 
         let self = this;
         iframe.onload = function () {
-            setTimeout(()=>{
+            setTimeout(()=> {
                 var bordersHeight = self.getBorderHeight(block);
 
                 iframe.style.height = block.clientHeight
                     + getStylePx(block, 'marginTop')
                     + getStylePx(block, 'marginBottom') + bordersHeight + 'px';
-            }, 500)
+            }, 600)
         }
 
         try {
@@ -288,31 +312,32 @@ export default class ImageInformerCreator {
         });
 
         // set styles
-        var style = infoWindow.createElement('style');
-        style.innerHTML = this._styles + `
-        body, html{
-            margin:0;
-            padding:0;
-        }
-        html {
-            -ms-overflow-style: -ms-autohiding-scrollbar;
-        }
-        .cbb {
-            position: absolute;
-            right: 0px;
-            top: 0px;
-        }
+        var cssStyle = infoWindow.createElement('style');
+        cssStyle.innerHTML = this._styles + `
+            body, html{
+                margin:0;
+                padding:0;
+            }
+            html {
+                -ms-overflow-style: -ms-autohiding-scrollbar;
+            }
+            .cbb {
+                position: absolute;
+                right: 0px;
+                top: 0px;
+            }
 
-        .cbb {
-            background-image: url(https://tpc.googlesyndication.com/pagead/images/x_button_blue2.svg);
-            background-repeat: no-repeat;
-            background-position: top right;
-            cursor: pointer;
-            height: 15px;
-            width: 15px;
-            z-index: 9020;
-        } `;
-        infoWindow.head.appendChild(style);
+            .cbb {
+                background-image: url(https://tpc.googlesyndication.com/pagead/images/x_button_blue2.svg);
+                background-repeat: no-repeat;
+                background-position: top right;
+                cursor: pointer;
+                height: 15px;
+                width: 15px;
+                z-index: 9020;
+            } `;
+        infoWindow.head.appendChild(cssStyle);
+
     }
 
     getBorderHeight(node) {

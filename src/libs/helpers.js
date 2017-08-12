@@ -84,4 +84,12 @@ function getViewPortSize() {
     return {viewportWidth, viewportHeight};
 }
 
-export {isTextNode, getStylePx, getParentFontSize, getViewPortSize, getNodeHeight}
+function getStyle(el, styleProp) {
+    if (el.currentStyle)
+        var y = el.currentStyle[styleProp];
+    else if (window.getComputedStyle)
+        var y = document.defaultView.getComputedStyle(el, null).getPropertyValue(styleProp);
+    return y;
+}
+
+export {isTextNode, getStylePx, getParentFontSize, getViewPortSize, getNodeHeight, getStyle, isNumeric}

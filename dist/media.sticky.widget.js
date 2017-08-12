@@ -1230,6 +1230,7 @@ var ArticleExtractor = function () {
         key: '_handleSpecialCases',
         value: function _handleSpecialCases() {
 
+            // found but not wat expected
             if (this.article && this.article.parentNode && this.article.parentNode.children[0] && this.article.parentNode.children[0].tagName === 'HEADER') {
                 this.article = this.article.parentNode;
                 return;
@@ -1257,26 +1258,45 @@ var ArticleExtractor = function () {
                 return;
             }
 
-            var articleInStructure = this.article.querySelector('div.td-pb-row > div.td-pb-span8.td-main-content > div.td-ss-main-content > this.article');
+            if (this.article) {
+                var articleInStructure = this.article.querySelector('div.td-pb-row > div.td-pb-span8.td-main-content > div.td-ss-main-content > this.article');
 
-            if (articleInStructure) {
-                this.article = articleInStructure;
-                return;
+                if (articleInStructure) {
+                    this.article = articleInStructure;
+                    return;
+                }
             }
 
-            if (this.article.classList.contains('post-body') && this.article.classList.contains('entry-content')) {
+            if (this.article && this.article.classList.contains('post-body') && this.article.classList.contains('entry-content')) {
                 this.article = this.article.parentNode;
                 return;
             }
 
-            if (this.articleParsed.rootElements && this.articleParsed.rootElements.length) {
+            if (this.articleParsed && this.articleParsed.rootElements && this.articleParsed.rootElements.length) {
                 [].forEach.call(this.articleParsed.rootElements, function (e) {
-                    if (e.tagName === 'this.article') {
+                    if (e.tagName === 'article') {
                         this.article = document.querySelector(e.tagName);
                     } else {
                         console.info('SmartInformerCreator._parseself.article: Cant parse self.article. ' + 'You should add this new condition to the code');
                     }
                 });
+            }
+
+            if (this.article && this.article.tagName === 'ARTICLE' && this.article.id.search('post-') != -1 && this.article.classList.contains('status-publish')) {
+                var main = document.querySelector('main#site-content.site-main');
+                if (main) {
+                    this.article = main;
+                    return;
+                }
+            }
+
+            // not found
+
+            if (!this.article) {
+                if (document.querySelector('div.entry-content')) {
+                    this.article = document.querySelector('div.entry-content');
+                    return;
+                }
             }
 
             if (this.article) {
@@ -1285,6 +1305,13 @@ var ArticleExtractor = function () {
 
             console.error('SmartInformerCreator._handleSpecialCases: article In DOM not recognized');
         }
+
+        /**
+         * Parse article
+         *
+         * @returns {Node|*|Element|null}
+         */
+
     }, {
         key: 'parseArticle',
         value: function parseArticle() {
@@ -1308,19 +1335,15 @@ var ArticleExtractor = function () {
                 pathBase: loc.protocol + "//" + loc.host + loc.pathname.substr(0, loc.pathname.lastIndexOf("/") + 1)
             }, document.cloneNode(true)).parse();
 
-            try {
-
-                if (this.articleParsed) {
-                    this.article = this._extractArticle(this.articleParsed.rootElements, true, this.articleParsed.rootElements.length);
-                    this._handleSpecialCases();
-                } else {
-                    this.article = null;
-                }
-
-                return this.article;
-            } catch (e) {
-                console.error(e);
+            if (this.articleParsed) {
+                this.article = this._extractArticle(this.articleParsed.rootElements, true, this.articleParsed.rootElements.length);
+            } else {
+                this.article = null;
             }
+
+            this._handleSpecialCases();
+
+            return this.article;
         }
     }]);
     return ArticleExtractor;
@@ -4472,11 +4495,16 @@ var _createClass3 = _interopRequireDefault(_createClass2);
 
 var _helpers = __webpack_require__(106);
 
+var helpers = _interopRequireWildcard(_helpers);
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) newObj[key] = obj[key]; } } newObj.default = obj; return newObj; } }
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var ImageInformerCreator = function () {
     function ImageInformerCreator(smartInformerName, id) {
         (0, _classCallCheck3.default)(this, ImageInformerCreator);
+
 
         if (!smartInformerName) {
             console.error('SmartInformerCreator.constructor: smartInformerName must be specified');
@@ -4493,15 +4521,28 @@ var ImageInformerCreator = function () {
         this.ids = ['ad-space', 'fb_comments_div', 'ad-space', 'div-gpt-ad', 'MarketGidScript', 'MarketGidScriptRoot', 'disqus_comments_div', 'ScriptRoot', 'Preload', 'MarketGidComposite', 'SC_TBlock'];
 
         this.height = 0;
+        this.supported_hosts = ['blogspot', 'hanoiiplus', /** FOR testing **/'newsatlast', 'ohtrending', 'albertespinola', 'webtretho'];
+        this.supported_hosts.push(document.location.host === 'localhost' ? 'newsatlast' : document.location.host);
     }
 
     (0, _createClass3.default)(ImageInformerCreator, [{
-        key: 'tryFindArticleImages',
-        value: function tryFindArticleImages(imageWidth, before, after) {
+        key: '_tryFindArticleImages',
+
+
+        /**
+         * Try to find images by their location
+         *
+         * @param imageWidth
+         * @param before
+         * @param after
+         * @returns {Array}
+         * @private
+         */
+        value: function _tryFindArticleImages(imageWidth, before, after) {
             var _this = this;
 
-            var _getViewPortSize = (0, _helpers.getViewPortSize)(),
-                viewportWidth = _getViewPortSize.viewportWidth;
+            var _helpers$getViewPortS = helpers.getViewPortSize(),
+                viewportWidth = _helpers$getViewPortS.viewportWidth;
 
             var parts = viewportWidth / 4;
             var allImages = document.querySelectorAll('img');
@@ -4539,12 +4580,21 @@ var ImageInformerCreator = function () {
 
             return this._images = array;
         }
+
+        /**
+         * Check if there is one of the parent node is Add
+         *
+         * @param _element
+         * @returns {boolean}
+         * @private
+         */
+
     }, {
         key: '_hasAddUpward',
         value: function _hasAddUpward(_element) {
 
             // by default - thing that there cant be ads inside text node
-            if ((0, _helpers.isTextNode)(_element) && !_element.parentNode) {
+            if (helpers.isTextNode(_element) && !_element.parentNode) {
                 return false;
             }
 
@@ -4567,6 +4617,59 @@ var ImageInformerCreator = function () {
             }
 
             return cantBeCalculated;
+        }
+
+        /**
+         * There is a list of supported hosts - field supported_hosts
+         * Check if given link's domain name is equal with
+         * one of the supported_hosts domain
+         *
+         * @param image
+         * @returns {boolean}
+         * @private
+         */
+
+    }, {
+        key: '_linkIsInSupportedHosts',
+        value: function _linkIsInSupportedHosts(image) {
+
+            var link = this._getParent(image, 'A');
+
+            if (!link) {
+                return true;
+            }
+
+            var isInSupportedDomainsList = false;
+
+            this.supported_hosts.forEach(function (host) {
+                !isInSupportedDomainsList && (isInSupportedDomainsList = link.href.search(host) != -1);
+            });
+
+            return isInSupportedDomainsList;
+        }
+
+        /**
+         * Get parent block with tagName
+         *
+         * @param e
+         * @param tagName
+         * @returns {*}
+         * @private
+         */
+
+    }, {
+        key: '_getParent',
+        value: function _getParent(e, tagName) {
+
+            if (!e || !tagName) {
+                return null;
+            }
+
+            if (e.tagName === tagName) {
+                return e;
+            }
+
+            return this._getParent(e.parentNode, tagName);
         }
     }, {
         key: '_isWrappedInLink',
@@ -4618,6 +4721,7 @@ var ImageInformerCreator = function () {
     }, {
         key: '_isInFigure',
         value: function _isInFigure(img) {
+
             if (!img || !img.parentNode) {
                 return false;
             }
@@ -4635,8 +4739,8 @@ var ImageInformerCreator = function () {
          */
 
     }, {
-        key: 'findSuitableImages',
-        value: function findSuitableImages() {
+        key: '_findSuitableImages',
+        value: function _findSuitableImages() {
             var imageWidth = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 400;
 
             var _this2 = this;
@@ -4646,13 +4750,12 @@ var ImageInformerCreator = function () {
 
 
             if (!this._article) {
-                console.warn('ImageInformerCreator .findSuitableImages: Article was not specified.');
-                return this.tryFindArticleImages(imageWidth, before, after);
+                console.warn('ImageInformerCreator ._findSuitableImages: Article was not specified.');
+                return this._tryFindArticleImages(imageWidth, before, after);
             }
 
             var array = [];
             [].forEach.call(this._article.querySelectorAll('img'), function (img) {
-
                 if (img.tagName !== 'IMG') {
                     return;
                 }
@@ -4661,14 +4764,20 @@ var ImageInformerCreator = function () {
                     return;
                 }
 
-                if (_this2._isWrappedInLink(img) || _this2._hasAddUpward(img)) {
+                var wrappedInLink = _this2._isWrappedInLink(img);
+
+                if (wrappedInLink && _this2._hasAddUpward(img)) {
+                    return;
+                }
+
+                if (wrappedInLink && !_this2._linkIsInSupportedHosts(img)) {
                     return;
                 }
 
                 if (_this2._isSuitableAspectRation(img, before, after)) {
-
                     if (_this2._isInFigure(img)) {
-                        array.push(img.parentNode);
+                        var figure = _this2._getParent(img, 'FIGURE');
+                        array.push(figure);
                         return;
                     }
 
@@ -4696,7 +4805,7 @@ var ImageInformerCreator = function () {
 
 
             if (!this._images || !this._images.length) {
-                console.info('ImageInformerCreator.insertWidget: No Where to render - no images. ' + 'Find images before calling this method. Run ImageInformerCreator.findSuitableImages.');
+                console.info('ImageInformerCreator.insertWidget: No Where to render - no images. ' + 'Find images before calling this method. Run ImageInformerCreator._findSuitableImages.');
                 return;
             }
 
@@ -4707,92 +4816,248 @@ var ImageInformerCreator = function () {
 
             var counter = 0;
             [].forEach.call(blocksToPaste, function (item) {
-                counter < max_img_for_sticky_widget && _this3._createIframe(item, _this3._images.shift());
+                counter < max_img_for_sticky_widget && _this3._initIFrame(item, _this3._images.shift());
                 counter++;
             });
         }
+
+        /**
+         * Create Ifrane after given block
+         *
+         * @param {Element} blockToiFrame - block to paste
+         * @param {Element} imgNode - block
+         * @private
+         */
+
     }, {
-        key: '_createIframe',
-        value: function _createIframe(block, img) {
+        key: '_initIFrame',
+        value: function _initIFrame(blockToiFrame, imgNode) {
 
-            if (!block) {
-                console.info('ImageInformerCreator._createIframe: ' + 'Cant insert add after image - no block left on the page');
+            if (!blockToiFrame) {
+                console.info('ImageInformerCreator._initIFrame: ' + 'Cant insert add after image - no block left on the page');
                 return;
             }
 
-            if (!img) {
-                console.info('ImageInformerCreator._createIframe: ' + 'Cant insert add after image - no image left on the page');
+            if (!imgNode) {
+                console.info('ImageInformerCreator._initIFrame: ' + 'Cant insert add after image - no image left on the page');
                 return;
             }
 
-            var style = window.getComputedStyle(img);
-            var width = style.width;
-            var marginBottom = style.marginBottom;
-            var marginLeft = style.marginLeft;
-            var marginRight = style.marginRight;
+            var iFrame = this._insertIFrameToPage(imgNode);
 
-            if (img.tagName === 'FIGURE') {
+            // fill the iFrame
+            try {
+                var infoWindow = iFrame.contentWindow.document;
+                infoWindow.open();
+                infoWindow.writeln("<html><head></head><body></body></html>");
+                infoWindow.close();
+                infoWindow.body.appendChild(blockToiFrame);
+
+                this._setIFrameHeight(iFrame, blockToiFrame);
+            } catch (e) {
+                console.error('ImageInformerCreator._initIFrame: Error ', e);
+            }
+
+            // set close button listeners
+            var closeButton = infoWindow.querySelector('.mgCloseButton');
+            closeButton.addEventListener('click', function () {
+                return iFrame.style.display = 'none';
+            });
+            closeButton.addEventListener('mousedown', function (e) {
+                e.which === 2 && (iFrame.style.display = 'none');
+                return true; // to allow the browser to know that we handled it.
+            });
+
+            // insert styles
+            var cssStyle = infoWindow.createElement('style');
+            cssStyle.innerHTML = this._styles + 'body,html{margin:0;padding:0}html{-ms-overflow-style:-ms-autohiding-scrollbar}.cbb{position:absolute;right:0;top:0;background-image:url(https://tpc.googlesyndication.com/pagead/images/x_button_blue2.svg);background-repeat:no-repeat;background-position:top right;cursor:pointer;height:15px;width:15px;z-index:9020}';
+            infoWindow.head.appendChild(cssStyle);
+        }
+    }, {
+        key: '_insertIFrameToPage',
+        value: function _insertIFrameToPage(img) {
+
+            var width = helpers.getStyle(img, 'width');
+            var marginBottom = helpers.getStyle(img, 'margin-bottom');
+            var marginLeft = helpers.getStyle(img, 'margin-left');
+            var marginRight = helpers.getStyle(img, 'margin-right');
+            var isFigure = img.tagName === 'FIGURE';
+
+            if (isFigure) {
                 var figureImage = img.querySelector('img');
                 if (figureImage) {
-                    var _style = window.getComputedStyle(figureImage);
-                    width = _style.width;
-                    marginBottom = _style.marginBottom;
-                    marginLeft = _style.marginLeft;
-                    marginRight = _style.marginRight;
+                    width = helpers.getStyle(figureImage, 'width');
+                    marginBottom = this._resetAndGet(img, 'margin-bottom', 'marginBottom') + 'px'; // _style.marginBottom;
+                    marginLeft = helpers.getStyle(figureImage, 'margin-left');
+                    marginRight = helpers.getStyle(figureImage, 'margin-right');
                 }
             }
 
             img.style.setProperty('margin-bottom', '0px', 'important');
             img.style.setProperty('padding-bottom', '0px', 'important');
-            img.style.setProperty('display', 'block', 'important');
 
             // reset margin bottom
-            var iframe = document.createElement('iframe');
-            iframe.style.borderWidth = '0';
-            iframe.style.width = width;
-            iframe.style.marginBottom = marginBottom;
-            iframe.style.marginLeft = marginLeft;
-            iframe.style.marginRight = marginRight;
-            img.parentNode.insertBefore(iframe, img.nextSibling);
+            var iFrame = document.createElement('iframe');
+            iFrame.style.borderWidth = '0';
+            iFrame.style.width = width;
+            iFrame.style.marginBottom = marginBottom;
+            iFrame.style.marginLeft = marginLeft;
+            iFrame.style.marginRight = marginRight;
 
-            var self = this;
-            iframe.onload = function () {
-                setTimeout(function () {
-                    var bordersHeight = self.getBorderHeight(block);
+            img.parentNode.insertBefore(iFrame, img.nextSibling);
 
-                    iframe.style.height = block.clientHeight + (0, _helpers.getStylePx)(block, 'marginTop') + (0, _helpers.getStylePx)(block, 'marginBottom') + bordersHeight + 'px';
-                }, 600);
-            };
-
-            try {
-                var infoWindow = iframe.contentWindow.document;
-                infoWindow.open();
-                infoWindow.writeln("<html><head></head><body></body></html>");
-                infoWindow.close();
-                infoWindow.body.appendChild(block);
-            } catch (e) {
-                console.error('ImageInformerCreator._createIframe: Error ', e);
+            if (!isFigure) {
+                this._correctMargin(iFrame, img);
+                this._correctSpecialCases(img);
             }
 
-            // add close button
-            var closeButton = infoWindow.querySelector('.mgCloseButton');
-            closeButton.addEventListener('click', function () {
-                return iframe.style.display = 'none';
-            });
-            closeButton.addEventListener('mousedown', function (e) {
-                e.which === 2 && (iframe.style.display = 'none');
-                return true; // to allow the browser to know that we handled it.
-            });
-
-            // set styles
-            var cssStyle = infoWindow.createElement('style');
-            cssStyle.innerHTML = this._styles + '\n            body, html{\n                margin:0;\n                padding:0;\n            }\n            html {\n                -ms-overflow-style: -ms-autohiding-scrollbar;\n            }\n            .cbb {\n                position: absolute;\n                right: 0px;\n                top: 0px;\n            }\n\n            .cbb {\n                background-image: url(https://tpc.googlesyndication.com/pagead/images/x_button_blue2.svg);\n                background-repeat: no-repeat;\n                background-position: top right;\n                cursor: pointer;\n                height: 15px;\n                width: 15px;\n                z-index: 9020;\n            } ';
-            infoWindow.head.appendChild(cssStyle);
+            return iFrame;
         }
     }, {
-        key: 'getBorderHeight',
-        value: function getBorderHeight(node) {
+        key: '_setIFrameHeight',
+        value: function _setIFrameHeight(iFrame, blockToiFrame) {
+
+            var getIFrameHeight = function getIFrameHeight() {
+                return iFrame.style.height = helpers.getStyle(blockToiFrame, 'height');
+            };
+
+            iFrame.addEventListener("readystatechange", function (e) {
+                return e.target.readyState == "complete" && getIFrameHeight();
+            });
+        }
+    }, {
+        key: '_correctMargin',
+        value: function _correctMargin(iFrame, node) {
+
+            var rectImg = node.getBoundingClientRect();
+            var rectIFrame = iFrame.getBoundingClientRect();
+
+            if (rectImg.bottom !== rectIFrame.top && rectImg.bottom < rectIFrame.top) {
+                iFrame.style.marginTop = -(rectIFrame.top - rectImg.bottom) + 'px';
+            }
+        }
+
+        /**
+         * Handler for special cases
+         *
+         * @param img
+         * @private
+         */
+
+    }, {
+        key: '_correctSpecialCases',
+        value: function _correctSpecialCases(img) {
+
+            var node = this._getNodeWithMarginEMCase(img);
+            if (node) {
+                node.style.setProperty('margin-left', '0px', 'important');
+                node.style.setProperty('margin-right', '0px', 'important');
+            }
+        }
+
+        /**
+         * Rule if parent element margin-left\fight are
+         * em + their parent text-align = center - reset margins
+         *
+         * @param node
+         * @returns {null|Element}
+         * @private
+         */
+
+    }, {
+        key: '_getNodeWithMarginEMCase',
+        value: function _getNodeWithMarginEMCase(node) {
+
+            var result = null;
+
+            if (!node || !node.style || !node.parentNode || !node.parentNode.style) {
+                return result;
+            }
+
+            var marginsAreEM = node.style.marginLeft.search('em') != -1 && node.style.marginRight.search('em') != -1;
+
+            if (marginsAreEM && node.parentNode.style.textAlign === 'center') {
+                result = node;
+            }
+
+            if (!result) {
+                result = this._getNodeWithMarginEMCase(node.parentNode);
+            }
+
+            return result;
+        }
+
+        /**
+         *
+         * @param node
+         * @returns {*}
+         * @private
+         */
+        //_isWrappedInText(node) {
+        //
+        //    if (!node) {
+        //        console.error('SmartInformerCreator._isWrappedInText: No node was provided');
+        //        return false;
+        //    }
+        //
+        //    if (!node.parentNode) {
+        //        return false;
+        //    }
+        //
+        //    if (['P', 'SPAN'].indexOf(node.parentNode.tagName) != -1) {
+        //        return true;
+        //    }
+        //
+        //    return this._isWrappedInText(node.parentNode);
+        //}
+
+        /**
+         * Get all children(+ their children) of the block
+         * For each node - get property value - return it
+         * For each node - set property value to null after getting it
+         * Accumulate and return property value
+         *
+         * Used for reset margins
+         *
+         * @param block
+         * @param property
+         * @param propertyCamel
+         * @returns {number}
+         * @private
+         */
+
+    }, {
+        key: '_resetAndGet',
+        value: function _resetAndGet(block, property, propertyCamel) {
             var _this4 = this;
+
+            var _style = window.getComputedStyle(block);
+
+            var sum = _style[propertyCamel] === 'auto' ? 0 : _style[propertyCamel] !== "" ? parseInt(_style[propertyCamel].replace('px', '')) : 0;
+
+            block.style.setProperty(property, '0', 'important');
+
+            if (block.children && block.children.length) {
+                [].forEach.call(block.children, function (e) {
+                    return sum += _this4._resetAndGet(e, property, propertyCamel);
+                });
+            }
+
+            return sum;
+        }
+
+        /**
+         * Go throw all children nodes and sum their border height
+         *
+         * @param node
+         * @returns {number}
+         * @private
+         */
+
+    }, {
+        key: '_getBorderHeight',
+        value: function _getBorderHeight(node) {
+            var _this5 = this;
 
             if (!node) {
                 return 0;
@@ -4802,7 +5067,7 @@ var ImageInformerCreator = function () {
 
             if (node.children && node.children.length) {
                 [].forEach.call(node.children, function (element) {
-                    result += _this4.getBorderHeight(element);
+                    result += _this5._getBorderHeight(element);
                 });
             }
 
@@ -4937,11 +5202,18 @@ function getViewPortSize() {
     return { viewportWidth: viewportWidth, viewportHeight: viewportHeight };
 }
 
+function getStyle(el, styleProp) {
+    if (el.currentStyle) var y = el.currentStyle[styleProp];else if (window.getComputedStyle) var y = document.defaultView.getComputedStyle(el, null).getPropertyValue(styleProp);
+    return y;
+}
+
 exports.isTextNode = isTextNode;
 exports.getStylePx = getStylePx;
 exports.getParentFontSize = getParentFontSize;
 exports.getViewPortSize = getViewPortSize;
 exports.getNodeHeight = getNodeHeight;
+exports.getStyle = getStyle;
+exports.isNumeric = isNumeric;
 
 /***/ })
 /******/ ]);

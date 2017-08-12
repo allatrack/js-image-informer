@@ -77,6 +77,7 @@ export default class ArticleExtractor {
      */
     _handleSpecialCases() {
 
+        // found but not wat expected
         if (this.article && this.article.parentNode && this.article.parentNode.children[0] && this.article.parentNode.children[0].tagName === 'HEADER') {
             this.article = this.article.parentNode;
             return;
@@ -104,21 +105,24 @@ export default class ArticleExtractor {
             return;
         }
 
-        var articleInStructure = this.article.querySelector('div.td-pb-row > div.td-pb-span8.td-main-content > div.td-ss-main-content > this.article');
 
-        if (articleInStructure) {
-            this.article = articleInStructure;
-            return;
+        if (this.article) {
+            var articleInStructure = this.article.querySelector('div.td-pb-row > div.td-pb-span8.td-main-content > div.td-ss-main-content > this.article');
+
+            if (articleInStructure) {
+                this.article = articleInStructure;
+                return;
+            }
         }
 
-        if (this.article.classList.contains('post-body') && this.article.classList.contains('entry-content')) {
+        if (this.article && this.article.classList.contains('post-body') && this.article.classList.contains('entry-content')) {
             this.article = this.article.parentNode;
             return;
         }
 
-        if (this.articleParsed.rootElements && this.articleParsed.rootElements.length) {
+        if (this.articleParsed && this.articleParsed.rootElements && this.articleParsed.rootElements.length) {
             [].forEach.call(this.articleParsed.rootElements, function (e) {
-                if (e.tagName === 'this.article') {
+                if (e.tagName === 'article') {
                     this.article = document.querySelector(e.tagName);
                 } else {
                     console.info('SmartInformerCreator._parseself.article: Cant parse self.article. ' +
@@ -127,6 +131,22 @@ export default class ArticleExtractor {
             });
         }
 
+        if (this.article && this.article.tagName === 'ARTICLE' && this.article.id.search('post-') != -1 && this.article.classList.contains('status-publish')) {
+            var main = document.querySelector('main#site-content.site-main');
+            if (main) {
+                this.article = main;
+                return;
+            }
+        }
+
+        // not found
+
+        if (! this.article) {
+            if ( document.querySelector('div.entry-content')) {
+                this.article = document.querySelector('div.entry-content');
+                return;
+            }
+        }
 
         if (this.article) {
             return;
@@ -135,7 +155,11 @@ export default class ArticleExtractor {
         console.error('SmartInformerCreator._handleSpecialCases: article In DOM not recognized');
     }
 
-
+    /**
+     * Parse article
+     *
+     * @returns {Node|*|Element|null}
+     */
     parseArticle() {
 
         // Readability's parse() works by modifying the DOM.
@@ -157,18 +181,16 @@ export default class ArticleExtractor {
             pathBase: loc.protocol + "//" + loc.host + loc.pathname.substr(0, loc.pathname.lastIndexOf("/") + 1)
         }, document.cloneNode(true)).parse();
 
-        try {
 
-            if (this.articleParsed){
-                this.article = this._extractArticle(this.articleParsed.rootElements, true, this.articleParsed.rootElements.length);
-                this._handleSpecialCases();
-            } else {
-                this.article =null;
-            }
-
-            return this.article ;
-        }catch(e){
-             console.error(e);
+        if (this.articleParsed) {
+            this.article = this._extractArticle(this.articleParsed.rootElements, true, this.articleParsed.rootElements.length);
+        } else {
+            this.article = null;
         }
+
+        this._handleSpecialCases();
+
+        return this.article;
+
     }
 }

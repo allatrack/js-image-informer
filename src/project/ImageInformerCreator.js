@@ -2,7 +2,20 @@ import * as helpers from './../libs/helpers';
 
 export default class ImageInformerCreator {
 
-    constructor(smartInformerName, id) {
+    constructor(smartInformerName, id, options = {
+        /**
+         * Percentage of article width whisch is used to detect images on mobile devices
+         */
+        mobileLeftRightOffset: 15,
+        /**
+         * Timeout which used is setTimeput while re-rendering informer
+         */
+        reRenderTimeout: 100,
+        /**
+         * Test domains - only for test purposes
+         */
+        testDomains:['newsatlast', 'ohtrending', 'albertespinola', 'webtretho', 'webtretho']
+    }) {
 
         if (!smartInformerName) {
             console.error('SmartInformerCreator.constructor: smartInformerName must be specified');
@@ -26,10 +39,16 @@ export default class ImageInformerCreator {
             'ScriptRoot', 'Preload', 'MarketGidComposite', 'SC_TBlock'];
 
         this.height = 0;
-        this.supported_hosts = ['blogspot', 'hanoiiplus', /** FOR testing **/  'newsatlast' , 'ohtrending', 'albertespinola', 'webtretho'] ;
+        this.supported_hosts = ['blogspot', 'hanoiiplus', ...options.testDomains ];
         this.supported_hosts.push(document.location.host === 'localhost'
             ? 'newsatlast'
             : document.location.host);
+
+        this.isFirefox = helpers.isFirefox();
+        this.isIE = helpers.isIE();
+        this.isMobile = helpers.isMobile();
+
+        this.options = options;
     }
 
     set stickyBlocksToPaste(blocks) {
@@ -70,10 +89,9 @@ export default class ImageInformerCreator {
         const {viewportWidth} = helpers.getViewPortSize();
 
         let parts = viewportWidth / 4;
-        let allImages = document.querySelectorAll('img');
 
         let array = [];
-        [].forEach.call(allImages, img=> {
+        [].forEach.call(document.querySelectorAll('img'), img=> {
 
             if (img.clientWidth && img.clientWidth <= imageWidth) {
                 return;
@@ -88,11 +106,37 @@ export default class ImageInformerCreator {
                 return;
             }
 
-            let rect = img.getBoundingClientRect();
-            let imageMiddle = rect.width / 2;
-            let imageMiddleImQuarter = imageMiddle >= parts && imageMiddle <= (parts * 3);
+            function getOffsetTop(elem) {
+                let offsetTop = 0;
 
-            if (this._isSuitableAspectRation(img, before, after) && imageMiddleImQuarter) {
+                do {
+                    ( !isNaN(elem.offsetTop) ) && (offsetTop += elem.offsetTop);
+                } while (elem = elem.offsetParent);
+
+                return offsetTop;
+            }
+
+            // calculate documentHeight
+            let body = document.body,
+                html = document.documentElement;
+            let documentHeight = Math.max(body.scrollHeight, body.offsetHeight,
+                html.clientHeight, html.scrollHeight, html.offsetHeight);
+
+            const HEADER_OFFSET = 300;
+            const FOOTER_OFFSET = 500;
+
+            // check in the middle
+            const rect = img.getBoundingClientRect();
+            const imageMiddle = rect.width / 2;
+            const imageMiddleImQuarter = imageMiddle >= parts && imageMiddle <= (parts * 3);
+
+            // check in the top / bottom
+            const imageTopOffset = getOffsetTop(img);
+            const imageBottomOffset = documentHeight - (img.clientHeight + imageTopOffset);
+            const imageIsNotInHeader = imageTopOffset > HEADER_OFFSET;
+            const imageIsNotInFooter = imageBottomOffset < (documentHeight - FOOTER_OFFSET);
+
+            if (this._isSuitableAspectRation(img, before, after) && imageMiddleImQuarter && imageIsNotInHeader && imageIsNotInFooter) {
 
                 if (this._isInFigure(img)) {
                     array.push(img.parentNode);
@@ -252,11 +296,21 @@ export default class ImageInformerCreator {
 
         let array = [];
         [].forEach.call(this._article.querySelectorAll('img'), img => {
+
+            if (this.isMobile) {
+
+                if (this._isImageSuitableForMobile(img)) {
+                    array.push(img);
+                }
+
+                return;
+            }
+
             if (img.tagName !== 'IMG') {
                 return;
             }
 
-            if (img.clientWidth && img.clientWidth <= imageWidth) {
+            if (imageWidth && img.clientWidth && img.clientWidth <= imageWidth) {
                 return;
             }
 
@@ -282,6 +336,29 @@ export default class ImageInformerCreator {
         });
 
         return this._images = array;
+    }
+
+    _isImageSuitableForMobile(img) {
+
+        if (img.tagName !== 'IMG') {
+            return false;
+        }
+
+        const wrappedInLink = this._isWrappedInLink(img);
+        if (wrappedInLink && this._hasAddUpward(img)) {
+            return false;
+        }
+        if (wrappedInLink && !this._linkIsInSupportedHosts(img)) {
+            return false;
+        }
+
+        const articleWidth = this._article.getBoundingClientRect().width;
+        const px = articleWidth * this.options.mobileLeftRightOffset / 100;
+        const right = articleWidth - px;
+        const left = px;
+        const rect = img.getBoundingClientRect();
+
+        return !!(rect.left <= left && rect.right >= right);
     }
 
     /**
@@ -320,6 +397,8 @@ export default class ImageInformerCreator {
      */
     _initIFrame(blockToiFrame, imgNode) {
 
+        let self = this;
+
         if (!blockToiFrame) {
             console.info('ImageInformerCreator._initIFrame: ' +
                 'Cant insert add after image - no block left on the page');
@@ -332,7 +411,7 @@ export default class ImageInformerCreator {
             return;
         }
 
-        var iFrame = this._insertIFrameToPage(imgNode);
+        var iFrame = self._insertIFrameToPage(blockToiFrame, imgNode);
 
         // fill the iFrame
         try {
@@ -342,7 +421,16 @@ export default class ImageInformerCreator {
             infoWindow.close();
             infoWindow.body.appendChild(blockToiFrame);
 
-            this._setIFrameHeight(iFrame, blockToiFrame);
+            let reRender = ()=> {
+                self._setIFrameStyles(iFrame, imgNode);
+
+                setTimeout(()=>{
+                    iFrame.height = blockToiFrame.clientHeight + self._getBorderHeight(blockToiFrame)
+                }, this.options.reRenderTimeout);
+            };
+
+            parent.window.addEventListener('resize', reRender);
+            parent.window.addEventListener("visibilitychange", reRender);
         }
         catch (e) {
             console.error('ImageInformerCreator._initIFrame: Error ', e);
@@ -357,65 +445,119 @@ export default class ImageInformerCreator {
         });
 
         // insert styles
-        var cssStyle = infoWindow.createElement('style');
-        cssStyle.innerHTML = this._styles + `body,html{margin:0;padding:0}html{-ms-overflow-style:-ms-autohiding-scrollbar}.cbb{position:absolute;right:0;top:0;background-image:url(https://tpc.googlesyndication.com/pagead/images/x_button_blue2.svg);background-repeat:no-repeat;background-position:top right;cursor:pointer;height:15px;width:15px;z-index:9020}`;
+        let cssStyle = infoWindow.createElement('style');
+        cssStyle.innerHTML = self._styles + `body,html{margin:0;padding:0}html{-ms-overflow-style:-ms-autohiding-scrollbar}.cbb{position:absolute;right:0;top:0;background-image:url(https://tpc.googlesyndication.com/pagead/images/x_button_blue2.svg);background-repeat:no-repeat;background-position:top right;cursor:pointer;height:15px;width:15px;z-index:9020}`;
         infoWindow.head.appendChild(cssStyle);
     }
 
-    _insertIFrameToPage(img) {
-
-        var width = helpers.getStyle(img, 'width');
-        var marginBottom = helpers.getStyle(img, 'margin-bottom');
-        var marginLeft = helpers.getStyle(img, 'margin-left');
-        var marginRight = helpers.getStyle(img, 'margin-right');
-        var isFigure = img.tagName === 'FIGURE';
-
-        if (isFigure) {
-            var figureImage = img.querySelector('img');
-            if (figureImage) {
-                width = helpers.getStyle(figureImage, 'width');
-                marginBottom = this._resetAndGet(img, 'margin-bottom', 'marginBottom') + 'px';// _style.marginBottom;
-                marginLeft = helpers.getStyle(figureImage, 'margin-left');
-                marginRight = helpers.getStyle(figureImage, 'margin-right');
-            }
-        }
+    _insertIFrameToPage(blockToiFrame, img) {
 
         img.style.setProperty('margin-bottom', '0px', 'important');
         img.style.setProperty('padding-bottom', '0px', 'important');
 
-        // reset margin bottom
-        var iFrame = document.createElement('iframe');
-        iFrame.style.borderWidth = '0';
-        iFrame.style.width = width;
-        iFrame.style.marginBottom = marginBottom;
-        iFrame.style.marginLeft = marginLeft;
-        iFrame.style.marginRight = marginRight;
+        // reset margin bottom\
+        let self = this;
+        let iFrame = document.createElement('iframe');
+        iFrame.onload = ()=> {
+            let setHeight = ()=>setTimeout(()=> {
+                iFrame.height = blockToiFrame.clientHeight + self._getBorderHeight(blockToiFrame);
+            }, self.options.reRenderTimeout);
+
+            if (parent.window.document.readyState === "complete") {
+                setHeight()
+            } else {
+                parent.window.document.addEventListener('readystatechange', ()=> {
+                    (document.readyState == "complete") && ( setHeight() );
+                });
+            }
+        };
 
         img.parentNode.insertBefore(iFrame, img.nextSibling);
 
-        if (!isFigure) {
-            this._correctMargin(iFrame, img);
-            this._correctSpecialCases(img);
-        }
+        self._setIFrameStyles(iFrame, img, true);
 
         return iFrame;
     }
 
-    _setIFrameHeight(iFrame, blockToiFrame) {
+    _setIFrameStyles(iFrame, node, isInit = false) {
 
-        var getIFrameHeight = ()=>iFrame.style.height = helpers.getStyle(blockToiFrame, 'height');
+        let self = this;
+        let setMargins = (iFrame, image, isFigure = false)=> {
 
-        iFrame.addEventListener("readystatechange", e =>(e.target.readyState == "complete") && ( getIFrameHeight() ))
+            let rectImg = image.getBoundingClientRect();
+            let rectIFrame = iFrame.getBoundingClientRect();
+
+            if (isInit || (rectImg.left !== rectIFrame.left)) {
+                iFrame.style.marginBottom = isFigure
+                    ? self._resetAndGet(node, 'margin-bottom', 'marginBottom') + 'px'
+                    : helpers.getStyle(image, 'margin-bottom');// _style.marginBottom;;;
+                iFrame.style.marginLeft = helpers.getStyle(image, 'margin-left');
+                iFrame.style.marginRight = helpers.getStyle(image, 'margin-right');
+            }
+
+            setTimeout(()=> {
+                iFrame.style.width = self.isIE ? image.clientWidth + 'px' : helpers.getStyle(image, 'width');
+            }, this.options.reRenderTimeout);
+
+            self._fixMargins(iFrame, node, image)
+        };
+
+        if (node.tagName === 'FIGURE') {
+            var figureImage = node.querySelector('img');
+
+            if (figureImage) {
+                setMargins(iFrame, figureImage, true);
+            } else {
+                throw new Error('ImageInformerCreator._setIFrameStyles: There is must be an image inside figure, none given');
+            }
+
+        } else {
+            setMargins(iFrame, node)
+        }
+
+        iFrame.style.borderWidth = '0';
     }
 
-    _correctMargin(iFrame, node) {
+    _fixMargins(iFrame, node, image) {
 
         let rectImg = node.getBoundingClientRect();
         let rectIFrame = iFrame.getBoundingClientRect();
+        let marginLeft = iFrame.style.marginLeft;
+        let marginRight = iFrame.style.marginRight;
+        let nodeIsFigure = node.tagName === 'FIGURE';
+        let setFigureImageMargin = ()=>iFrame.style.marginLeft = (node.querySelector('img').getBoundingClientRect().left - rectIFrame.left ) + 'px';
+        let handleSpecialCase = ()=> {
 
-        if (rectImg.bottom !== rectIFrame.top && rectImg.bottom < rectIFrame.top) {
-            iFrame.style.marginTop = ( -(rectIFrame.top - rectImg.bottom) ) + 'px';
+            var userAgentMargin;
+
+            (this.isIE) && (userAgentMargin = 'auto');
+
+            (this.isFirefox) && (userAgentMargin = '0px');
+
+            let marginIsAuto = marginLeft === userAgentMargin && marginRight === userAgentMargin;
+
+            if (marginIsAuto && rectImg.left !== rectIFrame.left) {
+                (rectImg.left > rectIFrame.left) && (iFrame.style.marginLeft = (rectImg.left - rectIFrame.left ) + 'px')
+            }
+
+            if (marginIsAuto && rectImg.left === rectIFrame.left
+                && nodeIsFigure
+                && node.parentNode.classList.contains('field-items')) {
+                setFigureImageMargin()
+            }
         }
+
+
+        if (!nodeIsFigure) {
+            let _rectImg = image.getBoundingClientRect();
+
+            if (_rectImg.bottom !== rectIFrame.top && _rectImg.bottom < rectIFrame.top) {
+                iFrame.style.marginTop = ( -(rectIFrame.top - _rectImg.bottom) ) + 'px';
+            }
+            this._correctSpecialCases(node);
+        }
+
+        handleSpecialCase()
     }
 
     /**
@@ -463,30 +605,6 @@ export default class ImageInformerCreator {
     }
 
     /**
-     *
-     * @param node
-     * @returns {*}
-     * @private
-     */
-    //_isWrappedInText(node) {
-    //
-    //    if (!node) {
-    //        console.error('SmartInformerCreator._isWrappedInText: No node was provided');
-    //        return false;
-    //    }
-    //
-    //    if (!node.parentNode) {
-    //        return false;
-    //    }
-    //
-    //    if (['P', 'SPAN'].indexOf(node.parentNode.tagName) != -1) {
-    //        return true;
-    //    }
-    //
-    //    return this._isWrappedInText(node.parentNode);
-    //}
-
-    /**
      * Get all children(+ their children) of the block
      * For each node - get property value - return it
      * For each node - set property value to null after getting it
@@ -510,11 +628,8 @@ export default class ImageInformerCreator {
         block.style.setProperty(property, '0', 'important');
 
         if (block.children && block.children.length) {
-            [].forEach.call(block.children, e =>
-                sum += this._resetAndGet(e, property, propertyCamel)
-            )
+            [].forEach.call(block.children, e => sum += this._resetAndGet(e, property, propertyCamel))
         }
-
         return sum;
     }
 

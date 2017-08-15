@@ -140,7 +140,6 @@ export default class ArticleExtractor {
         }
 
         // not found
-
         if (! this.article) {
             if ( document.querySelector('div.entry-content')) {
                 this.article = document.querySelector('div.entry-content');

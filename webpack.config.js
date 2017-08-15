@@ -5,6 +5,7 @@ var CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
     entry: [
+        './src/polyfills/isMobile.js',
         './src/polyfills/polyfill.ClassList.js',
         './src/polyfills/polyfill.includes.js',
         './src/polyfills/polyfill.indexOf.js',
